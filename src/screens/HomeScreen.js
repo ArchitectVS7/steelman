@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, SPACING } from '../constants/theme';
 import HeatSlider from '../components/HeatSlider';
 import { generateSteelman } from '../services/steelmanEngine';
@@ -26,13 +27,28 @@ export default function HomeScreen({ navigation }) {
   const [opinion, setOpinion] = useState('');
   const [heatLevel, setHeatLevel] = useState(3);
   const [loading, setLoading] = useState(false);
+  const [apiKey, setApiKey] = useState(null);
+  const [apiEndpoint, setApiEndpoint] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const key = await AsyncStorage.getItem('@steelman_api_key');
+        const endpoint = await AsyncStorage.getItem('@steelman_api_endpoint');
+        if (key) setApiKey(key);
+        if (endpoint) setApiEndpoint(endpoint);
+      } catch (err) {
+        // Settings load failed, stay in demo mode
+      }
+    })();
+  }, []);
 
   const handleSteelman = async () => {
     if (!opinion.trim()) return;
 
     setLoading(true);
     try {
-      const result = await generateSteelman(opinion.trim(), heatLevel);
+      const result = await generateSteelman(opinion.trim(), heatLevel, apiKey, apiEndpoint);
       navigation.navigate('Results', {
         opinion: opinion.trim(),
         heatLevel,

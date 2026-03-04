@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, SPACING, ITT_TOPICS } from '../constants/theme';
 import { gradeITT } from '../services/steelmanEngine';
 import ScoreCard from '../components/ScoreCard';
@@ -25,6 +26,21 @@ export default function ITTScreen() {
   const [scores, setScores] = useState(null);
   const [loading, setLoading] = useState(false);
   const [phase, setPhase] = useState('write'); // 'write' | 'results'
+  const [apiKey, setApiKey] = useState(null);
+  const [apiEndpoint, setApiEndpoint] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const key = await AsyncStorage.getItem('@steelman_api_key');
+        const endpoint = await AsyncStorage.getItem('@steelman_api_endpoint');
+        if (key) setApiKey(key);
+        if (endpoint) setApiEndpoint(endpoint);
+      } catch (err) {
+        // Settings load failed, stay in demo mode
+      }
+    })();
+  }, []);
 
   const handleNewTopic = useCallback(() => {
     setTopic(getRandomTopic(topic));
@@ -38,7 +54,7 @@ export default function ITTScreen() {
 
     setLoading(true);
     try {
-      const result = await gradeITT(topic, userAttempt.trim());
+      const result = await gradeITT(topic, userAttempt.trim(), apiKey, apiEndpoint);
       setScores(result);
       setPhase('results');
     } catch (err) {

@@ -35,6 +35,10 @@ export default function SettingsScreen() {
   };
 
   const saveSettings = async () => {
+    if (apiEndpoint && !apiEndpoint.startsWith('https://')) {
+      Alert.alert('Security Warning', 'API endpoint must use HTTPS for secure communication.');
+      return;
+    }
     try {
       await AsyncStorage.setItem(API_KEY_STORAGE, apiKey);
       await AsyncStorage.setItem(API_ENDPOINT_STORAGE, apiEndpoint);
