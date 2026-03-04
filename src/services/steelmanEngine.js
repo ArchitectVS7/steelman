@@ -45,8 +45,14 @@ function buildSystemPrompt(heatLevel) {
   return `${SYSTEM_PROMPT_BASE}\n\nTONE DIRECTIVE: ${getHeatModifier(heatLevel)}`;
 }
 
+function sanitizeInput(text) {
+  // Strip characters that could be interpreted as prompt control sequences
+  return text.replace(/[<>{}[\]]/g, '').trim();
+}
+
 function buildUserPrompt(opinion) {
-  return `Here is the opinion/hot take I want you to steelman the OPPOSING side of:\n\n"${opinion}"\n\nNow construct the strongest possible case for the opposing view, following Rapoport's Rules.`;
+  const sanitized = sanitizeInput(opinion);
+  return `Here is the opinion/hot take I want you to steelman the OPPOSING side of:\n\n"${sanitized}"\n\nNow construct the strongest possible case for the opposing view, following Rapoport's Rules.`;
 }
 
 /**
@@ -111,11 +117,11 @@ function parseResponse(content) {
   };
 
   const sectionPatterns = [
-    { key: 'reexpression', pattern: /##?\s*(?:1\.?\s*)?Re-?express(?:ion)?.*?\n([\s\S]*?)(?=##|\n##|$)/i },
-    { key: 'commonGround', pattern: /##?\s*(?:2\.?\s*)?Common Ground.*?\n([\s\S]*?)(?=##|\n##|$)/i },
-    { key: 'learned', pattern: /##?\s*(?:3\.?\s*)?What (?:You |I )?Learned.*?\n([\s\S]*?)(?=##|\n##|$)/i },
-    { key: 'steelman', pattern: /##?\s*(?:4\.?\s*)?(?:The )?Steelman.*?\n([\s\S]*?)(?=##|\n##|$)/i },
-    { key: 'weakPoint', pattern: /##?\s*(?:5\.?\s*)?Weak Point.*?\n([\s\S]*?)(?=##|\n##|$)/i },
+    { key: 'reexpression', pattern: /#{1,4}\s*(?:1\.?\s*)?Re-?express(?:ion)?.*?\n([\s\S]*?)(?=\n#{1,4}\s|$)/i },
+    { key: 'commonGround', pattern: /#{1,4}\s*(?:2\.?\s*)?Common Ground.*?\n([\s\S]*?)(?=\n#{1,4}\s|$)/i },
+    { key: 'learned', pattern: /#{1,4}\s*(?:3\.?\s*)?What (?:You |I )?Learned.*?\n([\s\S]*?)(?=\n#{1,4}\s|$)/i },
+    { key: 'steelman', pattern: /#{1,4}\s*(?:4\.?\s*)?(?:The )?Steelman.*?\n([\s\S]*?)(?=\n#{1,4}\s|$)/i },
+    { key: 'weakPoint', pattern: /#{1,4}\s*(?:5\.?\s*)?Weak Point.*?\n([\s\S]*?)(?=\n#{1,4}\s|$)/i },
   ];
 
   for (const { key, pattern } of sectionPatterns) {
@@ -226,7 +232,7 @@ Format as JSON: { "authenticity": N, "charity": N, "specificity": N, "empathy": 
       model: 'gpt-4o',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Topic to defend: "${topic}"\n\nUser's attempt:\n"${userAttempt}"` },
+        { role: 'user', content: `Topic to defend: "${sanitizeInput(topic)}"\n\nUser's attempt:\n"${sanitizeInput(userAttempt)}"` },
       ],
       temperature: 0.5,
       max_tokens: 500,
@@ -243,12 +249,14 @@ function gradeITTDemo(topic, userAttempt) {
   const hasEmotion = /feel|believe|care|matter|important|love|fear|hope/i.test(userAttempt);
   const hasSpecifics = /\d|percent|study|research|data|evidence/i.test(userAttempt);
   const hasDismissive = /obviously|clearly wrong|stupid|ridiculous|nonsense/i.test(userAttempt);
+  const hasFirstPerson = /\bI believe\b|\bI feel\b|\bI think\b|\bmy view\b|\bin my experience\b/i.test(userAttempt);
+  const isSubstantial = wordCount > 150;
 
-  let authenticity = Math.min(10, 4 + (wordCount > 50 ? 2 : 0) + (hasEmotion ? 2 : 0) + (hasDismissive ? -3 : 0));
-  let charity = Math.min(10, 5 + (hasDismissive ? -4 : 0) + (hasEmotion ? 1 : 0));
+  let authenticity = Math.min(10, 4 + (wordCount > 50 ? 2 : 0) + (hasEmotion ? 2 : 0) + (hasFirstPerson ? 1 : 0) + (isSubstantial ? 1 : 0) + (hasDismissive ? -3 : 0));
+  let charity = Math.min(10, 5 + (hasDismissive ? -4 : 0) + (hasEmotion ? 1 : 0) + (hasFirstPerson ? 2 : 0) + (isSubstantial ? 1 : 0));
   let specificity = Math.min(10, 3 + (hasExamples ? 3 : 0) + (hasSpecifics ? 2 : 0) + (wordCount > 100 ? 2 : 0));
-  let empathy = Math.min(10, 4 + (hasEmotion ? 3 : 0) + (hasDismissive ? -3 : 0));
-  let biasLeakage = Math.min(10, 6 + (hasDismissive ? -5 : 0) + (hasEmotion ? 1 : 0));
+  let empathy = Math.min(10, 4 + (hasEmotion ? 3 : 0) + (hasFirstPerson ? 1 : 0) + (isSubstantial ? 1 : 0) + (hasDismissive ? -3 : 0));
+  let biasLeakage = Math.min(10, 6 + (hasDismissive ? -5 : 0) + (hasEmotion ? 1 : 0) + (hasFirstPerson ? 1 : 0) + (isSubstantial ? 1 : 0));
 
   // Clamp values
   authenticity = Math.max(1, authenticity);
@@ -280,4 +288,4 @@ function gradeITTDemo(topic, userAttempt) {
   return { authenticity, charity, specificity, empathy, biasLeakage, total, grade, feedback };
 }
 
-export { buildSystemPrompt, buildUserPrompt, SYSTEM_PROMPT_BASE };
+export { buildSystemPrompt, buildUserPrompt, sanitizeInput, SYSTEM_PROMPT_BASE };
