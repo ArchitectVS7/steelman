@@ -2,8 +2,24 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { NavigationContainer } from '@react-navigation/native';
-import { Text, StyleSheet } from 'react-native';
+import { Text, StyleSheet, Platform } from 'react-native';
 import { COLORS } from '../constants/theme';
+
+const linking = {
+  prefixes: [],
+  config: {
+    screens: {
+      Steelman: {
+        screens: {
+          Home: '',
+          Results: 'results',
+        },
+      },
+      'ITT Game': 'itt',
+      Settings: 'settings',
+    },
+  },
+};
 
 import HomeScreen from '../screens/HomeScreen';
 import ResultsScreen from '../screens/ResultsScreen';
@@ -58,7 +74,7 @@ function TabIcon({ emoji, focused }) {
 
 export default function AppNavigator() {
   return (
-    <NavigationContainer>
+    <NavigationContainer linking={Platform.OS === 'web' ? linking : undefined} documentTitle={{ formatter: () => 'Steelman' }}>
       <Tab.Navigator
         screenOptions={{
           tabBarStyle: styles.tabBar,
